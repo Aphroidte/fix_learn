@@ -1,0 +1,29 @@
+{
+    "tasks": [
+        {
+            "type": "shell",
+            "label": "cmake",
+            "command": "cmake",
+            "args": [".."],
+        },
+        {
+            "label":"make",
+            "type":"shell",
+            "command":"make",
+        },
+        {
+            // 对应 launch.json里的"preLaunchTask":"Build"
+            //调试前执行cmake 和 make两条终端命令实现自动编译
+            "label": "Build",
+            "dependsOrder": "sequence",
+            "dependsOn":[
+                "cmake",
+                "make"
+            ],
+        }
+    ],
+    "version": "2.0.0",
+    "options":{
+        "cwd": "${workspaceFolder}/build"
+    }
+}

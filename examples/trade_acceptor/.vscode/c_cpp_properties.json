@@ -1,0 +1,47 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/**",
+                /////////////////////////////////////////////////////////////////////////////////////////////////
+                // stl库以及系统头文件
+                "/usr/lib/gcc/x86_64-redhat-linux/4.8.5/../../../../include/c++/4.8.5/**",
+                "/usr/lib/gcc/x86_64-redhat-linux/4.8.5/../../../../include/c++/4.8.5/x86_64-redhat-linux/**",
+                "/usr/lib/gcc/x86_64-redhat-linux/4.8.5/../../../../include/c++/4.8.5/backward/**",
+                "/usr/lib/gcc/x86_64-redhat-linux/4.8.5/include/**",
+                "/usr/local/include/**",
+                "/usr/include/**",
+
+                /////////////////////////////////////////////////////////////////////////////////////////////////
+                //! 公共库 fsi_libs 相关头文件
+                // srpc相关头文件
+                "/usr/local/fsi_libs/srpc_lib/include/",
+                "/usr/local/fsi_libs/srpc_lib/include/sync_incl/",
+                "/usr/local/fsi_libs/srpc_lib/include/rpc_incl/",
+                // fsi2相关头文件
+
+                // ftrace 相关头文件
+                "/usr/local/fsi_libs/svr_lib/proto3/ftrace/include/ftrace/",
+
+                // cmlb 相关头文件
+                "/usr/local/fsi_libs/svr_lib/fsi2/include/cmlb/",
+                "/usr/local/fsi_libs/svr_lib/fsi2/include/ut",
+                "/usr/local/fsi_libs/uls_lib/",
+
+                /////////////////////////////////////////////////////////////////////////////////////////////////
+                //! 自己项目相关的包含路径
+                "/home/arnicedeng/work_space/quickfix_learn/examples/quickfix/include/quickfix/**",
+                "/home/arnicedeng/work_space/quickfix_learn/examples/quickfix/include/quickfix/fix42/**",
+                "/home/arnicedeng/work_space/quickfix_learn/examples/trade_acceptor/src/**"
+            ],
+            "defines": [],
+            "compilerPath": "/usr/bin/g++",
+            "cStandard": "c11",
+            "cppStandard": "c++11",
+            "intelliSenseMode": "linux-gcc-x64",
+            "configurationProvider": "ms-vscode.cmake-tools"
+        }
+    ],
+    "version": 4
+}
