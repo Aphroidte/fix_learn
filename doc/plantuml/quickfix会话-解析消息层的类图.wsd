@@ -1,0 +1,459 @@
+@startuml quickfix_session_fixsession_classmap
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' 以下是类实例的定义
+package "会话逻辑层" #DDDDDD
+{
+' 维护状态并实现 FIX 会话的逻辑。
+class Session
+{
+    ' 成员变量
+    - m_application : Application&
+    - m_sessionID : SessionID
+    - m_state : SessionState
+    - m_pResponder : Responder*
+    ..
+    - m_dataDictionaryProvider : DataDictionaryProvider
+    - m_messageStoreFactory : MessageStoreFactory&
+    - m_pLogFactory : LogFactory*
+    - m_mutex : Mutex
+    ..
+    {static}- s_sessions : map<SessionID, Session*>
+    {static}- s_sessionIDs : set<SessionID>
+    {static}- s_registered : map<SessionID, Session*>
+    {static}- s_mutex : Mutex
+    ..
+    ' 与配置文件中的配置项相对应的成员变量
+    - m_sessionTime : TimeRange
+    - m_logonTime : TimeRange
+    - m_senderDefaultApplVerID : string
+    - m_targetDefaultApplVerID : string
+    - m_sendRedundantResendRequests : bool
+    - m_checkCompId : bool
+    - m_checkLatency : bool
+    - m_maxLatency : int
+    - m_resetOnLogon : bool
+    - m_resetOnLogout : bool
+    - m_resetOnDisconnect : bool
+    - m_refreshOnLogon : bool
+    - m_timestampPrecision : int
+    - m_persistMessages : bool
+    - m_validateLengthAndCheckSum : bool
+    --
+    ' 成员函数
+    - send(Message&) : bool
+    - send(const string&) : bool
+    - sendRaw(Message&, int = 0) : bool
+    - resend(Message&) : bool
+    - shouleSendReset() : bool
+    - disconnect() : void
+    - generateLogon() : void
+    - generateLogon(const Message&) : void
+    - generateResendRequest(const BeginString&, const MsgSeqNum&) : void
+    - generateSequenceReset(int, int) : void
+    - generateHeartbeat() : void
+    - generateHeartbeat(const Message&) : void
+    - generateTestRequest(const std::string&) : void
+    - generateReject(const Message&, int, int = 0) : void
+    - generateReject(const Message&, const std::string&) : void
+    - generateBusinessReject(const Message&, int, int = 0) : void
+    - generateLogout( const std::string&= "") : void
+    - populateRejectReason(Message&, int, const std::string&) : void
+    - populateRejectReason(Message&, const std::string&) : void
+    ..
+    - next() : void
+    - next(const UtcTimeStamp&) : void
+    - next(const string&, const UtcTimeStamp&, bool = false) : void
+    - next(const Message&, const UtcTimeStamp&, bool = false) : void
+    - verfy(const Message&, bool = true, bool = true) : bool
+    - fromCallback(const MsgType&, const Message&, const SessionID&) : void
+    - nextLogon(const Message&, const UtcTimeStamp&) : void
+    - nextLogout(const Message&, const UtcTimeStamp&) : void
+    - nextHeartbeat(const Message&, const UtcTimeStamp&) : void
+    - nextTestRequest(const Message&, const UtcTimeStamp&) : void
+    - nextReject(const Message&, const UtcTimeStamp&) : void
+    - nextSequenceReset(const Message&, const UtcTimeStamp&) : void
+    - nextResendRequest(const Message&, const UtcTimeStamp&) : void
+    - nextQueued(int, const UtcTimeStamp&) : bool
+    - nextQueued(const UtcTimeStamp&) : void
+    ..
+    - persist(const Message&, const string&) : void
+    - setNextSenderMsgSeqNum(int) : void
+    - SetNextTargetMsgSeqNum(int) : void
+    - getExpectedSenderNum() : int
+    - getExpectedTargetNum() : int
+    ..
+    - doBadTime(const Message&) : void
+    - doBadCompID(const Message&) : void
+    - doPossDup(const Message&) : bool
+    - doTargetTooLow(const Message&) : bool
+    - doTargetTooHight(const Message&) : void
+    - insertSendingTime(Header&) : void
+    - insertOrigSendingTime(Header&, const UtcTimeStamp& = UtcTimeStamp()) : void
+    - fill(Header&) : void
+    ..
+    - reset() : void
+    {static}- sendToTarget(Message&, const string& = "") : bool
+    {static}- sendToTarget(Message&, cosnt SessionID&) : bool
+    {static}- sendToTarget(Message&, const SenderCompID&, const TargetCompID&, const string& = "") : bool
+    {static}- sendToTarget(Message&, const string&, const string&, const string& = "") : bool
+    {static}- getSessions() : set<SessoinID>
+    {static}- lookupSession(const SessionID&) : Session*
+    {static}- lookupSession(const string&, bool = false) : Session*
+    {static}- isSessionRegistered(const SessionID&) : bool
+    {static}- registerSession(const SessionID&) : Session&
+    {static}- unregisterSession(const SessionID&)
+    {static}- numSessions() : size_t
+    {static}- addSession(Sessioni&) : bool
+    {static}- removeSession(Session&) : void
+    ..
+    ' 设置或获取状态相关的函数
+    - logon() : void
+    - logout(const string& = "") : void
+    - isEnable() : bool
+    - sentLogon() : bool
+    - sentLogout() : bool
+    - receivedLogon() : bool
+    - isLoggedOn() : bool
+    - refresh() : void
+    ..
+    ' 获取/设置成员变量的函数
+    {method}- getter & setter
+}
+}
+' end package
+
+package "会话状态与序列号管理" #DDDDDD
+{
+interface MessageStore
+{
+    ' 成员函数
+    {abstract}+ set(int, const string&) : bool
+    {abstract}+ get(int, int, vector<string>&) : void
+    {abstract}+ getNextSenderMsgSeqNum() : int
+    {abstract}+ getNextTargetMsgSeqNum() : int
+    {abstract}+ setNextSenderMsgSeqNum(int) : void
+    {abstract}+ setNextTargetMsgSeqNum(int) : void
+    {abstract}+ incrNextSenderMsgSeqNum() : void
+    {abstract}+ incrNextTargetMsgSeqNum() : void
+    {abstract}+ getCreateionTime() : UtcTimeStamp
+    {abstract}+ reset() : void
+    {abstract}+ refresh() : void
+}
+
+interface MessageStoreFactory
+{
+    ' 成员方法
+    {abstract}+ create(const SessionID&) : MessageStore*
+    {abstract}+ destroy(MessageStore*) : void
+}
+
+class FileStoreFactory
+{
+    ' 成员变量
+    - m_path : string
+    - m_settings : SessionSettings
+    ' 成员函数
+    + create(const SessionID&) : MessageStore*
+    + destroy(MessageStore*) : void
+}
+
+' 基于文件的存储实现
+class FileStore
+{
+    ' 成员变量
+    - m_cache : MemoryStore
+    - m_offsets : map<int, pair<int, int>>
+    - m_msgFileName : string
+    - m_headerFileName : string
+    - m_seqNumsFileNmae : string
+    - m_msgFile : FILE*
+    - m_headerFile : FILE*
+    - m_seqNumsFile : FILE*
+    - m_sessionFile : FILE*
+    --
+    ' 成员函数
+    + set(int, const string&) : bool
+    + get(int, int, vector<string>&) : void
+    + getNextSenderMsgSeqNum() : int
+    + getNextTargetMsgSeqNum() : int
+    + setNextSenderMsgSeqNum(int) : void
+    + setNextTargetMsgSeqNum(int) : void
+    + incrNextSenderMsgSeqNum() : void
+    + incrNextTargetMsgSeqNum() : void
+    + getCreateionTime() : UtcTimeStamp
+    + reset() : void
+    + refresh() : void
+    ..
+    - open(bool) : void
+    - populateCache() : void
+    - readFromFile(int, int, string&) : bool
+    - setSeqNum() : void
+    - setSession() : void
+    - get(int, string&) : bool
+}
+
+class MemoryStore
+{
+    ' 成员变量
+    - m_messages : map<int, string>
+    - m_nextSenderMsgSeqNum : int
+    - m_nextTargetMsgSeqNum : int
+    - m_creationTime : UtcTimeStamp
+    ' 成员函数
+    + set(int, const string&) : bool
+    + get(int, int, vector<string>&) : void
+    + getNextSenderMsgSeqNum() : int
+    + getNextTargetMsgSeqNum() : int
+    + setNextSenderMsgSeqNum(int) : void
+    + setNextTargetMsgSeqNum(int) : void
+    + incrNextSenderMsgSeqNum() : void
+    + incrNextTargetMsgSeqNum() : void
+    + getCreateionTime() : UtcTimeStamp
+    + reset() : void
+    + refresh() : void
+}
+
+' 基于mysql的存储实现
+class MySQLStoreFactory
+{
+    ' 成员变量
+    - m_connectionPoolPtr : MySQLConnectionPoolPtr
+    - m_settings : SessionSettings
+    - m_dictionary : Dictionary
+    - m_database : string
+    - m_password : string
+    - m_user : string
+    - m_password : string
+    - m_host : string
+    - m_port : short
+    - m_useSettings : bool
+    - m_useDictionary : bool
+    ' 成员函数
+    + create(const SessionID&) : MessageStore*
+    + destroy(MessageStore*) : void
+    - create(const SessionID&, const Dictionary&) : MessageStore*
+}
+
+class MySQLStore
+{
+    ' 成员变量
+    - m_cache : MemoryStore
+    - m_pConnection : MySQLConnection*
+    - m_pConnectionPool : MySQLConnectionPool*
+    - m_sessionID : SessionID
+    ' 成员函数
+    + set(int, const string&) : bool
+    + get(int, int, vector<string>&) : void
+    + getNextSenderMsgSeqNum() : int
+    + getNextTargetMsgSeqNum() : int
+    + setNextSenderMsgSeqNum(int) : void
+    + setNextTargetMsgSeqNum(int) : void
+    + incrNextSenderMsgSeqNum() : void
+    + incrNextTargetMsgSeqNum() : void
+    + getCreateionTime() : UtcTimeStamp
+    + reset() : void
+    + refresh() : void
+}
+
+class OdbcStoreFactory
+{
+    ' 成员变量
+    - m_dictionary : Dictionary
+    - m_settings : SessionSettings
+    - m_user : string
+    - m_password : string
+    - m_connectionString : string
+    - m_useSettings : bool
+    - m_useDictionary : bool
+    ' 成员函数
+    + create(const SessionID&) : MessageStore*
+    + destroy(MessageStore*) : void
+    - create(const SessionID&, const Dictionary&) : MessageStore*
+}
+
+class OdbcStore
+{
+    ' 成员变量
+    - m_cache : MemoryStore
+    - m_pConnection : OdbcConnection*
+    - m_sessionID : SessionID
+    ' 成员函数
+    + set(int, const string&) : bool
+    + get(int, int, vector<string>&) : void
+    + getNextSenderMsgSeqNum() : int
+    + getNextTargetMsgSeqNum() : int
+    + setNextSenderMsgSeqNum(int) : void
+    + setNextTargetMsgSeqNum(int) : void
+    + incrNextSenderMsgSeqNum() : void
+    + incrNextTargetMsgSeqNum() : void
+    + getCreateionTime() : UtcTimeStamp
+    + reset() : void
+    + refresh() : void
+    - populateCache() : void
+}
+
+' 维护Session类的所有状态
+class SessionState
+{
+    ' 成员变量
+    - m_enabled : bool
+    - m_receivedLogon : bool
+    - m_sentLogout : bool
+    - m_sentLogon : bool
+    - m_sentReset : bool
+    - m_receivedReset : bool
+    - m_initiate : bool
+    - m_logonTimeout : int
+    - m_logoutTimeout : int
+    - m_testRequest : int
+    - m_resendRange : ResendRange
+    - m_heartBtInt : HeartBtInt
+    - m_lastSentTime : UtcTimeStamp
+    - m_lastReceivedTime : UtcTimeStamp
+    - m_logoutReason : string
+    - m_queue : map<int, Message>
+    - m_pStore : MessageStore*
+    - m_pLog : Log*
+    - m_nullLog : NullLog
+    - m_mutex : Mutex
+    ' 成员函数
+    --
+    ' 缓存发送过的消息
+    - getNextSenderMsgSeqNum() : int
+    - getNextTargetMsgSeqNum() : int
+    - setNextSenderMsgSeqNum(int) : void
+    - setNextTargetMsgSeqNum(int) : void
+    - incrNextSenderMsgSeqNum() : void
+    - incrNextTargetMsgSeqNum() : void
+    - queue(int, const Message&) : void
+    - retrieve(int, Message&)
+    - clearQueue() : void
+    ..
+    - onIncoming() : void
+    - onOutgoing() : void
+    - onEvent() : void
+    - reset() : void
+    - refresh() : void
+    - clear() : void
+    - backup() : void
+    ..
+    ' 以下是根据 Fix 会话中的各种规定进行状态的设置
+    - receivedLogon() : bool
+    - receivedLogon(bool) : void
+    - sentLogout() : bool
+    - sentLogout(bool) : void
+    - sentLogon() : bool
+    - sentLogon(bool) : void
+    - receivedReset() : bool
+    - receivedReset(bool) : void
+    - sentReset() : bool
+    - sentReset(bool) : void
+    - initiate() : bool
+    - initiate(bool) : void
+    - logonTimeout() : int
+    - logonTimeout(int) : void
+    - logoutTimeout() : int
+    - logoutTimeout() : void
+    - testRequest() : int
+    - testRequest(int) : void
+    - resendRequested() : bool
+    - resendRange() : pair<int, int>
+    - resendRage(int, int) : void
+    - store() : MessageStore*
+    - store(MessageStore) : void
+    - log() : Log*
+    - log(Log*) : void
+    - heartBtInt() : HeartBtInt&
+    - heartBtInt() : const HeartBtInt&
+    - heartBtInt(cosnt HeartBtInt) : void
+    - lastSendTime(const UtcTimeStamp&) : void
+    - lastSendTime() : UtcTimeStamp
+    - lastReceivedTime(const UtcTimeStamp&) : void
+    - lastReceivedTime() : UtcTimeStamp
+    - lastReceivedTime() : const UtcTimeStamp
+    - shouleSendLogon() : bool
+    - alreadySendLogon() : bool
+    - logonTimedOut() : bool
+    - logoutTimedOut() : bool
+    - withinHeartBeat() : bool
+    - timedOut() : bool
+    - needHeartbeat() : bool
+    - needTestRequest() : bool
+    - logoutReason() : string
+    - logoutReson (const string&) : void
+    - set(int, string&) : bool
+    - get(int, int, vector<string>&) : void
+    - getCreateionTime() : UtcTimeStamp
+}
+}
+' end package
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' 以下是注释
+
+note left of FileStore::populateCache
+从文件中读出数据
+比如：读出序列号，设置到内存中
+end note
+
+note left of FileStore::open
+1. 先读出文件中的数据写入内存
+2. 将内存中的数据同步到文件
+有什么意义？
+end note
+
+note left of FileStore::"set(int, const string&)"
+通信过程中，
+实时地将收到的消息写入文件
+end note
+
+note left of FileStore::setSeqNum
+通信过程中，
+实时地将序列号的变更同步到文件
+end note
+
+note left of FileStore::setSession
+通信过程中，
+实时地将会话创建时间的变更同步到文件
+end note
+
+note left of Session::"send(const string&)"
+发送消息的接口
+最终会调用 SocketConnection::send
+end note
+
+note left of Session::"generateLogon(const Message&)"
+generate* 方法用于构造与发送管理消息
+end note
+
+note left of Session::"next()"
+用于在长时间没有数据发送时
+发送心跳包给对端
+end note
+
+note left of Session::"next(const string&, const UtcTimeStamp&, bool = false)"
+用于接收并解析消息
+回调 Application::to* 方法
+end note
+
+note left of Session::"persist(const Message&, const string&)"
+发送消息后递增序列号
+end note
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' 以下是类关系的定义
+
+Session --> SessionState : contains
+FileStore --> MemoryStore : contains
+MySQLStore --> MemoryStore : contains
+OdbcStore --> MemoryStore : contains
+
+MessageStoreFactory ..> MessageStore 
+MessageStoreFactory <|-- FileStoreFactory : implements
+MessageStoreFactory <|-- MySQLStoreFactory : implements
+MessageStoreFactory <|-- OdbcStoreFactory : implements
+MessageStore <|-- FileStore : implements
+MessageStore <|-- MySQLStore : implements
+MessageStore <|-- OdbcStore : implements
+MessageStore <|-- MemoryStore : implements
+@enduml
