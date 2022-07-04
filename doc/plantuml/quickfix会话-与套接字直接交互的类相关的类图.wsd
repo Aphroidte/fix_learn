@@ -1,0 +1,159 @@
+@startuml quickfix_session_socket_classmap
+package "与套接字直接交互" #DDDDDD {
+' 监听端口和接受连接上来的套接字
+class SocketServer
+{
+    ' 成员变量
+    - m_socketToInof : map<socket_handle, SocketInfo>
+    - m_portToInfo : map<int, SocketInfo>
+    - m_monitor : SocketMonitor
+    --
+    ' 成员函数
+    + add(int, bool = false, bool = false, int = 0, int = 0) : socket_handle
+    + accept(socket_handle) : socket_handle
+    + close() : void
+    + block(Strategy&, bool = 0, double = 0.0) : void
+    ..
+    + numConnections() : size_t
+    + socketToPort(socket_handle) : int
+    + portToSocket(int) : socket_handle
+    + getMonitor() : SocketMonitor
+}
+
+' 成功监听端口的套接字的信息
+class SocketInfo
+{
+    ' 成员变量
+    + m_socket : socket_handle
+    + m_port : short
+    + m_noDelay : bool
+    + m_sendBufSize : int
+    + m_rcvBufSize : int
+}
+
+' 监听套接字上的各种事件：读写、连接、断连、超时、发生错误
+class SocketMonitor
+{
+    ' 成员变量
+    - m_timeout : int
+    - m_timeval : timeval
+    - m_signal : socket_handle
+    - m_interrupt : socket_handle
+    ..
+    - m_connectSockets : set<socket_handle>
+    - m_readSockets : set<socket_handle>
+    - m_writeSockets : set<socket_handle>
+    - m_dropped : queue<socket_handle>
+    --
+    ' 成员函数
+    + addConnect(socket_handle) : bool
+    + addRead(socket_handle) : bool
+    + addWrite(socket_handle) : bool
+    + drop(socket_handle) : bool
+    + block(SocketMonitor::Strategy&, bool = 0, double = 0.0) : void
+    ..
+    + signal(socket_handle) : void
+    + unsignal(socket_handle) : void
+    + numSockets() : size_t
+    ..
+    - processReadSet(SocketMonitor::Strategy&, fd_set&) : void
+    - processWriteSet(SocketMonitor::Strategy&, fd_set&) : void
+    - processExceptSet(SocketMonitor::Strategy&, fd_set&) : void
+    ..
+    - setsockopt() : void
+    - bind() : bool
+    - listen() : bool
+    - buildSet(const set<socket_handle>&, fd_set&) : void
+    - getTimeval(bool, double) : timeval*
+}
+}
+' end package
+
+package "响应套接字事件" #DDDDDD {
+' 监听端口和接受连接上来的套接字
+' 定义响应套接字各种事件（读写、连接、断连、超时、发生错误）的接口
+'   为什么要定义两个 Strategy 接口（在SocketServer下也有一个一模一样的接口）？
+interface SocketMonitor::Strategy <<interface>>
+{
+    ' 成员函数
+    {abstract}+ onConnect(SocketMonitor&, socket_handle, socket_handle) : void
+    {abstract}+ onWrite(SocketMonitor&, socket_handle) : void
+    {abstract}+ onEvent(SocketMonitor&, socket_handle) : void
+    {abstract}+ onDisconnect(SocketMonitor&, socket_handle) : void
+    {abstract}+ onError(SocketMonitor&, socket_handle) : void
+    {abstract}+ onError(SocketMonitor&) : void
+    + onTimeout(SocketMonitor&) : void
+}
+
+' 处理来自 SocketMonito 的事件
+class SocketWrapper
+{
+    ' 成员变量
+    - m_sockets : set<socket_handle>
+    - m_server : SocketServer&
+    - m_strategy : SocketServer::Strategy&
+    ' 成员函数
+    - onConnect(SocketServer&, socket_handle, socket_handle) : void
+    - onWrite(SocketServer&, socket_handle) : void
+    - onEvent(SocketServer&, socket_handle) : void
+    - onDisconnect(SocketServer&, socket_handle) : void
+    - onError(SocketServer&, socket_handle) : void
+    - onError(SocketMonitor&) : void
+    - onTimeout(SocketMonitor&) : void
+}
+}
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' 以下是注释
+
+note left of SocketServer::add
+为配置文件中的每个 acceptor 的
+[SESSION] 段创建监听端口的套接字
+end note
+
+note left of SocketServer::accept
+接受对端的连接
+生成对应的套接字用于收发消息
+end note
+
+note left of SocketServer::block
+检查套接字的状态：读/写、或异常等
+并回调对应的方法进行处理
+end note
+
+note left of SocketMonitor::block
+主动轮询所有套接字中的各种事件
+（不是通过libev 事件机制来实现的）
+end note
+
+note left of SocketMonitor::processReadSet
+处理套接字的读事件，分为两种：
+1. 对端连接上来，则从监听端口的套接字中读出对端的连接
+    并通过 accept 创建连接套接字
+2. 从对端连接的套接字中读出消息
+end note
+
+note top of SocketWrapper
+该类主要是被当做参数传入 SocketMonitor::block中
+进行响应各种套接字事件
+end note
+
+note right of SocketWrapper::onEven
+1. 响应对端连接的到来: 回调 SocketAcceptor::onConnect
+2. 从套接字中读取消息: 回调 SocketAcceptor::onData
+end note
+
+note right of SocketWrapper::"onError(SocketServer&, socket_handle)"
+处理异常的套接字：
+1. 回调 SocketAcceptor::onDisconnect()
+2. 将套接字加入到 m_dropped 中进行删除
+end note
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' 以下是类关系的定义
+
+SocketServer "1" --> "0...*" SocketInfo : contains
+SocketServer "1" --> "1" SocketMonitor : contains
+
+SocketMonitor::Strategy <|.. SocketWrapper : implements
+@enduml

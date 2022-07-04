@@ -1,0 +1,103 @@
+@startuml quickfix_session_mid_classmap
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' 以下是类实例的定义
+
+package "中间层" #DDDDDD
+{
+
+' fix协议中的 acceptor 的抽象基类，负责监听端口与响应对端的连接。
+'   1. 一般情况下无需继承并实现该类，直接使用默认实现 SocketAcceptor 即可。
+class Acceptor
+{
+    ' 成员变量
+    - thread_id : m_threadid
+    - m_sessions : map<SessionID, Session*>
+    - m_sessionIDs : set<SessionID>
+    - m_application : Application&
+    - m_messageStoreFactory : MessageStoreFactory&
+    - m_pLogFactory : LogFactory
+    - m_pLog : Log
+    - m_nullLog : NullLog
+    - m_firstPoll : bool
+    - m_stop : bool
+    # m_settings : SessionSettings
+    --
+    ' 成员函数
+    + start() : void
+    + block() : void
+    + pool(double = 0.0) : bool
+    + stop(bool = false) : void
+    + isLoggedOn() : bool
+    ..
+    ' 主要是获取Session对象，以及其他成员
+    {method}+  getter
+    ..
+    ' 提供给业务层实现回调函数，主要是在配置、启动/停止、初始化 acceptor 的时候进行回调
+    {abstract}- onConfigure(const SessionSettings&) : void
+    {abstract}- onInitialize(const SessionSettings&) : void
+    {abstract}- onStart() : void
+    {abstract}- onPoll(double) : bool
+    {abstract}- onStop() : void
+    ..
+    - initialize() : void
+    ' 静态方法，主要是启动线程，调用onStart()，进行操作套接字
+    {static} - startThread(void*) : THREAD_PROC
+}
+
+' 定义响应套接字各种事件（读写、连接、断连、超时、发生错误）的接口
+interface SocketServer::Strategy <<interface>>
+{
+    ' 成员函数
+    {abstract}+ onConnect(SocketServer&, socket_handle, socket_handle) : void
+    {abstract}+ onWrite(SocketServer&, socket_handle) : void
+    {abstract}+ onData(SocketServer&, socket_handle) : bool
+    {abstract}+ onDisconnect(SocketServer&, socket_handle) : void
+    {abstract}+ onError(SocketServer&) : void
+    + onTimeout(SocketServer&) : void
+}
+
+' acceptor 的套接字实现。
+class SocketAcceptor
+{
+    ' 成员变量
+    - m_pServer : SocketServer
+    - m_portToSession : map<int, set<SessionID>>
+    - m_connections : <socket_handle, SocketConnection*>
+    --
+    ' 成员函数
+    ' 响应 acceptor 的事件：配置、启动/停止、初始化
+    - onStart() : void
+    - onConfigure(const SessionSettings&) : void
+    - onInitialize(const SessionSettings&) : void
+    - onPoll(double) : bool
+    - onStop() : void
+    ..
+    ' 响应 套接字上的各种事件：读写、连接、断连、超时、发生错误
+    - onConnect(SocketServer&, socket_handle, socket_handle) : void
+    - onWrite(SocketServer&, socket_handle) : void
+    - onData(SocketServer&, socket_handle) : bool
+    - onDisconnect(SocketServer&, socket_handle) : void
+    - onError(SocketServer&) : void
+    - onTimeout(SocketServer&) : void
+}
+}
+' end package
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' 以下是注释
+
+note left of SocketAcceptor::onStart
+初始化完成之后，在线程中调用
+定时调用 SocketServer::block 与套接字交互
+end note
+
+note left of SocketAcceptor::onData
+从套接字中读取消息的回调函数
+end note
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' 以下是类关系的定义
+
+Acceptor <|-- SocketAcceptor : extends
+SocketServer::Strategy <|.. SocketAcceptor : implements
+@enduml
