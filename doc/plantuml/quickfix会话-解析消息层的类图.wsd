@@ -119,10 +119,104 @@ class Session
     ' 获取/设置成员变量的函数
     {method}- getter & setter
 }
+
+' 维护Session类的所有状态
+class SessionState
+{
+    ' 成员变量
+    - m_enabled : bool
+    - m_receivedLogon : bool
+    - m_sentLogout : bool
+    - m_sentLogon : bool
+    - m_sentReset : bool
+    - m_receivedReset : bool
+    - m_initiate : bool
+    - m_logonTimeout : int
+    - m_logoutTimeout : int
+    - m_testRequest : int
+    - m_resendRange : ResendRange
+    - m_heartBtInt : HeartBtInt
+    - m_lastSentTime : UtcTimeStamp
+    - m_lastReceivedTime : UtcTimeStamp
+    - m_logoutReason : string
+    - m_queue : map<int, Message>
+    - m_pStore : MessageStore*
+    - m_pLog : Log*
+    - m_nullLog : NullLog
+    - m_mutex : Mutex
+    ' 成员函数
+    --
+    ' 缓存发送过的消息
+    - getNextSenderMsgSeqNum() : int
+    - getNextTargetMsgSeqNum() : int
+    - setNextSenderMsgSeqNum(int) : void
+    - setNextTargetMsgSeqNum(int) : void
+    - incrNextSenderMsgSeqNum() : void
+    - incrNextTargetMsgSeqNum() : void
+    - queue(int, const Message&) : void
+    - retrieve(int, Message&)
+    - clearQueue() : void
+    ..
+    - onIncoming() : void
+    - onOutgoing() : void
+    - onEvent() : void
+    - reset() : void
+    - refresh() : void
+    - clear() : void
+    - backup() : void
+    ..
+    ' 以下是根据 Fix 会话中的各种规定进行状态的设置
+    - receivedLogon() : bool
+    - receivedLogon(bool) : void
+    - sentLogout() : bool
+    - sentLogout(bool) : void
+    - sentLogon() : bool
+    - sentLogon(bool) : void
+    - receivedReset() : bool
+    - receivedReset(bool) : void
+    - sentReset() : bool
+    - sentReset(bool) : void
+    - initiate() : bool
+    - initiate(bool) : void
+    - logonTimeout() : int
+    - logonTimeout(int) : void
+    - logoutTimeout() : int
+    - logoutTimeout() : void
+    - testRequest() : int
+    - testRequest(int) : void
+    - resendRequested() : bool
+    - resendRange() : pair<int, int>
+    - resendRage(int, int) : void
+    - store() : MessageStore*
+    - store(MessageStore) : void
+    - log() : Log*
+    - log(Log*) : void
+    - heartBtInt() : HeartBtInt&
+    - heartBtInt() : const HeartBtInt&
+    - heartBtInt(cosnt HeartBtInt) : void
+    - lastSendTime(const UtcTimeStamp&) : void
+    - lastSendTime() : UtcTimeStamp
+    - lastReceivedTime(const UtcTimeStamp&) : void
+    - lastReceivedTime() : UtcTimeStamp
+    - lastReceivedTime() : const UtcTimeStamp
+    - shouleSendLogon() : bool
+    - alreadySendLogon() : bool
+    - logonTimedOut() : bool
+    - logoutTimedOut() : bool
+    - withinHeartBeat() : bool
+    - timedOut() : bool
+    - needHeartbeat() : bool
+    - needTestRequest() : bool
+    - logoutReason() : string
+    - logoutReson (const string&) : void
+    - set(int, string&) : bool
+    - get(int, int, vector<string>&) : void
+    - getCreateionTime() : UtcTimeStamp
+}
 }
 ' end package
 
-package "会话状态与序列号管理" #DDDDDD
+package "会话消息与序列号管理" #DDDDDD
 {
 interface MessageStore
 {
@@ -291,100 +385,6 @@ class OdbcStore
     + refresh() : void
     - populateCache() : void
 }
-
-' 维护Session类的所有状态
-class SessionState
-{
-    ' 成员变量
-    - m_enabled : bool
-    - m_receivedLogon : bool
-    - m_sentLogout : bool
-    - m_sentLogon : bool
-    - m_sentReset : bool
-    - m_receivedReset : bool
-    - m_initiate : bool
-    - m_logonTimeout : int
-    - m_logoutTimeout : int
-    - m_testRequest : int
-    - m_resendRange : ResendRange
-    - m_heartBtInt : HeartBtInt
-    - m_lastSentTime : UtcTimeStamp
-    - m_lastReceivedTime : UtcTimeStamp
-    - m_logoutReason : string
-    - m_queue : map<int, Message>
-    - m_pStore : MessageStore*
-    - m_pLog : Log*
-    - m_nullLog : NullLog
-    - m_mutex : Mutex
-    ' 成员函数
-    --
-    ' 缓存发送过的消息
-    - getNextSenderMsgSeqNum() : int
-    - getNextTargetMsgSeqNum() : int
-    - setNextSenderMsgSeqNum(int) : void
-    - setNextTargetMsgSeqNum(int) : void
-    - incrNextSenderMsgSeqNum() : void
-    - incrNextTargetMsgSeqNum() : void
-    - queue(int, const Message&) : void
-    - retrieve(int, Message&)
-    - clearQueue() : void
-    ..
-    - onIncoming() : void
-    - onOutgoing() : void
-    - onEvent() : void
-    - reset() : void
-    - refresh() : void
-    - clear() : void
-    - backup() : void
-    ..
-    ' 以下是根据 Fix 会话中的各种规定进行状态的设置
-    - receivedLogon() : bool
-    - receivedLogon(bool) : void
-    - sentLogout() : bool
-    - sentLogout(bool) : void
-    - sentLogon() : bool
-    - sentLogon(bool) : void
-    - receivedReset() : bool
-    - receivedReset(bool) : void
-    - sentReset() : bool
-    - sentReset(bool) : void
-    - initiate() : bool
-    - initiate(bool) : void
-    - logonTimeout() : int
-    - logonTimeout(int) : void
-    - logoutTimeout() : int
-    - logoutTimeout() : void
-    - testRequest() : int
-    - testRequest(int) : void
-    - resendRequested() : bool
-    - resendRange() : pair<int, int>
-    - resendRage(int, int) : void
-    - store() : MessageStore*
-    - store(MessageStore) : void
-    - log() : Log*
-    - log(Log*) : void
-    - heartBtInt() : HeartBtInt&
-    - heartBtInt() : const HeartBtInt&
-    - heartBtInt(cosnt HeartBtInt) : void
-    - lastSendTime(const UtcTimeStamp&) : void
-    - lastSendTime() : UtcTimeStamp
-    - lastReceivedTime(const UtcTimeStamp&) : void
-    - lastReceivedTime() : UtcTimeStamp
-    - lastReceivedTime() : const UtcTimeStamp
-    - shouleSendLogon() : bool
-    - alreadySendLogon() : bool
-    - logonTimedOut() : bool
-    - logoutTimedOut() : bool
-    - withinHeartBeat() : bool
-    - timedOut() : bool
-    - needHeartbeat() : bool
-    - needTestRequest() : bool
-    - logoutReason() : string
-    - logoutReson (const string&) : void
-    - set(int, string&) : bool
-    - get(int, int, vector<string>&) : void
-    - getCreateionTime() : UtcTimeStamp
-}
 }
 ' end package
 
@@ -443,12 +443,16 @@ end note
 ''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
 ' 以下是类关系的定义
 
-Session --> SessionState : contains
+Session -left-> SessionState : contains
 FileStore --> MemoryStore : contains
 MySQLStore --> MemoryStore : contains
 OdbcStore --> MemoryStore : contains
+SessionState --> MessageStore : contains
 
 MessageStoreFactory ..> MessageStore 
+FileStoreFactory ..> FileStore
+MySQLStoreFactory ..> MySQLStore
+OdbcStoreFactory ..> OdbcStore
 MessageStoreFactory <|-- FileStoreFactory : implements
 MessageStoreFactory <|-- MySQLStoreFactory : implements
 MessageStoreFactory <|-- OdbcStoreFactory : implements
